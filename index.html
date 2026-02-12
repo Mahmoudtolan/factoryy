@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام تنظيم الورديات الذكي</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
+        .animate-pop { animation: pop 0.3s ease-out; }
+        @keyframes pop { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        select { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ==========================================
+        // بيانات الـ Firebase الخاصة بك تم وضعها هنا
+        // ==========================================
+        const myPersonalConfig = {
+            apiKey: "AIzaSyAHnY8FBpDm82LQhgI19LfOf1lbC1n4r0w",
+            authDomain: "mmmmmm-51a8f.firebaseapp.com",
+            projectId: "mmmmmm-51a8f",
+            storageBucket: "mmmmmm-51a8f.firebasestorage.app",
+            messagingSenderId: "279285591548",
+            appId: "1:279285591548:web:517585cc42289af258d679",
+            measurementId: "G-22H9BK5YNG"
+        };
+
+        // التحقق من وجود الإعدادات
+        let finalConfig = myPersonalConfig;
+        try {
+            if (!finalConfig && typeof __firebase_config !== 'undefined' && __firebase_config) {
+                finalConfig = JSON.parse(__firebase_config);
+            }
+        } catch (e) { console.error(e); }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'factory-shifts-manager-v5';
+        const REST_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+
+        // --- الأيقونات ---
+        const Icon = ({ name }) => {
+            const icons = {
+                lock: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+                unlock: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
+                save: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>,
+                clock: <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+                calendar: <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+                coffee: <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>,
+                dashboard: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+                users: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+                reset: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            };
+            return icons[name] || null;
+        };
+
+        const InputField = ({ id, label, shifts, activeFieldId, activeValue, isAdmin, onFocus, onChange, onSave, onUnlock }) => {
+            const isLocked = shifts[`${id}_locked`] && !isAdmin;
+            const isEditing = activeFieldId === id;
+            const val = isEditing ? activeValue : (shifts[id] || "");
+
+            return (
+                <div className="flex gap-1.5">
+                    <input 
+                        type="text"
+                        autoComplete="off"
+                        className={`w-full p-2.5 text-sm rounded-xl border-2 transition-all outline-none ${isLocked ? 'bg-slate-100 text-slate-400 border-slate-100' : 'bg-white border-slate-200 focus:border-blue-500'}`}
+                        value={val}
+                        disabled={isLocked}
+                        placeholder={label}
+                        onFocus={() => onFocus(id, shifts[id] || "")}
+                        onChange={(e) => onChange(e.target.value)}
+                    />
+                    {isEditing && (
+                        <button onClick={() => onSave(id)} className="bg-blue-600 text-white px-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
+                            <Icon name="save" />
+                        </button>
+                    )}
+                    {isAdmin && isLocked && !isEditing && (
+                        <button onClick={() => onUnlock(id, shifts[id] || "")} className="bg-orange-100 text-orange-600 px-3 rounded-xl hover:bg-orange-200">
+                            <Icon name="unlock" />
+                        </button>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [shifts, setShifts] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [adminClicks, setAdminClicks] = useState(0);
+            const [view, setView] = useState('register');
+            const [activeFieldId, setActiveFieldId] = useState(null);
+            const [activeValue, setActiveValue] = useState("");
+            const [message, setMessage] = useState({ text: "", type: "" });
+
+            useEffect(() => {
+                if (!finalConfig) { setLoading(false); return; }
+                
+                try {
+                    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(finalConfig);
+                    const db = firebase.firestore();
+                    const auth = firebase.auth();
+
+                    auth.signInAnonymously().then(() => {
+                        const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('shifts').doc('current_week');
+                        return docRef.onSnapshot(docSnap => {
+                            if (docSnap.exists) setShifts(docSnap.data());
+                            else docRef.set({}).catch(console.error);
+                            setLoading(false);
+                        }, err => { console.error(err); setLoading(false); });
+                    }).catch(e => { console.error(e); setLoading(false); });
+                } catch (e) { console.error(e); setLoading(false); }
+            }, []);
+
+            const showMsg = (text, type) => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage({ text: "", type: "" }), 3000);
+            };
+
+            const isDuplicate = (name, currentId) => {
+                const cleaned = name.trim();
+                if (!cleaned) return false;
+                const getGroup = (id) => {
+                    if (id.startsWith('s1') || id.startsWith('s2') || id.startsWith('s3')) return 'DAILY';
+                    if (id.startsWith('f') || id.startsWith('r_f')) return 'FRIDAY';
+                    if (id.startsWith('sa') || id.startsWith('r_sa')) return 'SATURDAY';
+                    return 'OTHER';
+                };
+                const group = getGroup(currentId);
+                return Object.entries(shifts).some(([key, val]) => 
+                    !key.endsWith('_locked') && !key.endsWith('_day') && key !== currentId && getGroup(key) === group && String(val).trim() === cleaned
+                );
+            };
+
+            const handleSave = async (id) => {
+                const val = activeValue.trim();
+                if (!val) return;
+                if (!isAdmin && isDuplicate(val, id)) return showMsg("الاسم مكرر في نفس المجموعة اليومية!", "error");
+
+                try {
+                    const db = firebase.firestore();
+                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('shifts').doc('current_week');
+                    await docRef.update({ [id]: val, [`${id}_locked`]: true });
+                    setActiveFieldId(null);
+                    showMsg("تم الحفظ بنجاح", "success");
+                } catch (e) { showMsg("خطأ في الحفظ", "error"); }
+            };
+
+            if (!finalConfig) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+                        <div className="bg-white p-10 rounded-[40px] shadow-2xl border border-red-50 max-w-md animate-pop">
+                            <div className="text-red-500 mb-6 flex justify-center scale-150"><Icon name="lock" /></div>
+                            <h2 className="text-2xl font-black text-slate-800 mb-4">تنبيه: البيانات غير مربوطة</h2>
+                            <p className="text-slate-500 text-sm leading-relaxed mb-8">أنت تفتح الملف كصفحة ويب مستقلة. لكي يعمل الحفظ، يجب إضافة بيانات الـ Firebase Config داخل الكود المصدر.</p>
+                            <div className="p-4 bg-slate-50 rounded-2xl text-[10px] text-left font-mono text-slate-400">
+                                const config = &#123; ... &#125;;
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
+
+            return (
+                <div className="max-w-5xl mx-auto p-4 md:p-8">
+                    <header className="flex justify-between items-center mb-10 bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                        <div className="flex items-center gap-3 cursor-pointer select-none active:scale-95 transition-transform" onClick={() => { setAdminClicks(c => { if (c+1 === 5) { setIsAdmin(true); showMsg("وضع المسؤول نشط", "success"); return 0; } return c+1; }); }}>
+                            <div className="bg-blue-600 p-2.5 rounded-2xl text-white shadow-lg shadow-blue-100"><Icon name="users" /></div>
+                            <div>
+                                <h1 className="text-xl font-black text-slate-900 leading-none">منظومة الورديات</h1>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">المصنع الذكي</span>
+                            </div>
+                        </div>
+                        <button onClick={() => setView(view === 'register' ? 'dashboard' : 'register')} className={`px-6 py-3 rounded-2xl text-sm font-black flex items-center gap-2 transition-all active:scale-95 ${view === 'dashboard' ? 'bg-blue-600 text-white shadow-xl shadow-blue-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                            {view === 'register' ? <><Icon name="dashboard" /> النتائج</> : <><Icon name="users" /> التسجيل</>}
+                        </button>
+                    </header>
+
+                    {message.text && (
+                        <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-50 px-8 py-4 rounded-3xl shadow-2xl text-white font-black animate-pop ${message.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                            {message.text}
+                        </div>
+                    )}
+
+                    {view === 'register' ? (
+                        <div className="space-y-10">
+                            <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-3 mb-8"><div className="p-3 rounded-2xl text-white bg-blue-600 shadow-lg shadow-blue-100"><Icon name="clock" /></div><h2 className="text-xl font-black">الورديات اليومية</h2></div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {['s1', 's2', 's3'].map((s, i) => (
+                                        <div key={s} className="space-y-4 p-5 bg-slate-50/50 rounded-3xl border border-slate-100">
+                                            <h4 className="text-xs font-black text-blue-600 border-b border-blue-100 pb-2">الوردية {i+1}</h4>
+                                            <InputField id={`${s}_w1`} label="عامل 1" shifts={shifts} activeFieldId={activeFieldId} activeValue={activeValue} isAdmin={isAdmin} onFocus={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} onChange={setActiveValue} onSave={handleSave} onUnlock={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} />
+                                            <InputField id={`${s}_w2`} label="عامل 2" shifts={shifts} activeFieldId={activeFieldId} activeValue={activeValue} isAdmin={isAdmin} onFocus={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} onChange={setActiveValue} onSave={handleSave} onUnlock={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-3 mb-8"><div className="p-3 rounded-2xl text-white bg-emerald-600 shadow-lg shadow-emerald-100"><Icon name="calendar" /></div><h2 className="text-xl font-black">عطلة نهاية الأسبوع</h2></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {['f1', 'f2', 'f3', 'sa1'].map((s, i) => (
+                                        <div key={s} className="space-y-4 p-5 bg-slate-50/50 rounded-3xl border border-slate-100">
+                                            <h4 className="text-xs font-black text-emerald-600 border-b border-emerald-100 pb-2">{i === 3 ? 'السبت' : `الجمعة و${i+1}`}</h4>
+                                            <InputField id={`${s}_w1`} label="عامل 1" shifts={shifts} activeFieldId={activeFieldId} activeValue={activeValue} isAdmin={isAdmin} onFocus={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} onChange={setActiveValue} onSave={handleSave} onUnlock={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} />
+                                            <InputField id={`${s}_w2`} label="عامل 2" shifts={shifts} activeFieldId={activeFieldId} activeValue={activeValue} isAdmin={isAdmin} onFocus={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} onChange={setActiveValue} onSave={handleSave} onUnlock={(id, val) => { setActiveFieldId(id); setActiveValue(val); }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-3 mb-8"><div className="p-3 rounded-2xl text-white bg-orange-500 shadow-lg shadow-orange-100"><Icon name="coffee" /></div><h2 className="text-xl font-black">الراحات البديلة (تلقائي)</h2></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {['r_f1', 'r_f2', 'r_f3', 'r_sa1'].map(rId => {
+                                        const src = rId.replace('r_', '');
+                                        return (
+                                            <div key={rId} className="p-5 bg-orange-50/30 rounded-3xl border border-orange-100 space-y-6">
+                                                <h4 className="text-[10px] font-black uppercase text-orange-600">{rId.includes('sa') ? 'بديلة السبت' : `بديلة الجمعة و${rId.charAt(rId.length-1)}`}</h4>
+                                                {[1, 2].map(n => {
+                                                    const fid = `${rId}_d${n}`;
+                                                    const isLocked = shifts[`${fid}_locked`] && !isAdmin;
+                                                    const val = activeFieldId === fid ? activeValue : (shifts[fid] || "");
+                                                    return (
+                                                        <div key={n} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100">
+                                                            <div className="flex items-center gap-2 mb-3 text-sm font-black text-slate-700">
+                                                                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                                                {shifts[`${src}_w${n}`] || "---"}
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <select className={`flex-1 bg-slate-50 p-3 rounded-xl text-sm outline-none font-bold ${isLocked ? 'text-slate-400' : 'text-slate-800'}`} value={val} disabled={isLocked} onChange={(e) => { setActiveFieldId(fid); setActiveValue(e.target.value); }}>
+                                                                    <option value="">اختر يوم الراحة...</option>
+                                                                    {REST_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                                </select>
+                                                                {activeFieldId === fid && <button onClick={() => handleSave(fid)} className="bg-blue-600 text-white px-3 rounded-xl shadow-lg"><Icon name="save" /></button>}
+                                                                {isAdmin && isLocked && <button onClick={() => { setActiveFieldId(fid); setActiveValue(shifts[fid]); }} className="bg-orange-100 text-orange-600 px-3 rounded-xl"><Icon name="unlock" /></button>}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-sm animate-pop">
+                            <h2 className="text-3xl font-black mb-10 flex items-center gap-4 text-slate-800"><Icon name="dashboard" /> تقرير توزيع الورديات</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {[
+                                    { id: 's1', label: 'الوردية 1' }, { id: 's2', label: 'الوردية 2' }, { id: 's3', label: 'الوردية 3' },
+                                    { id: 'f1', label: 'جمعة و1' }, { id: 'f2', label: 'جمعة و2' }, { id: 'f3', label: 'جمعة و3' },
+                                    { id: 'sa1', label: 'السبت و1' }
+                                ].map(item => (
+                                    <div key={item.id} className="p-6 bg-slate-50 rounded-[32px] border border-slate-100">
+                                        <div className="text-[10px] font-black text-blue-600 mb-3 uppercase tracking-widest">{item.label}</div>
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-slate-800 text-lg">{shifts[`${item.id}_w1`] || "---"}</span>
+                                                {shifts[`r_${item.id}_d1`] && <span className="text-xs text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-lg w-fit mt-1">الراحة: {shifts[`r_${item.id}_d1`]}</span>}
+                                            </div>
+                                            <div className="flex flex-col border-t border-slate-200 pt-4">
+                                                <span className="font-black text-slate-800 text-lg">{shifts[`${item.id}_w2`] || "---"}</span>
+                                                {shifts[`r_${item.id}_d2`] && <span className="text-xs text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-lg w-fit mt-1">الراحة: {shifts[`r_${item.id}_d2`]}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {isAdmin && <button onClick={() => { if(confirm("هل تريد تصفير البيانات؟")) { firebase.firestore().collection('artifacts').doc(appId).collection('public').doc('data').collection('shifts').doc('current_week').set({}); setIsAdmin(false); showMsg("تم التصفير", "success"); } }} className="mt-16 w-full bg-red-50 text-red-600 py-6 rounded-[30px] font-black flex items-center justify-center gap-3 hover:bg-red-600 hover:text-white transition-all shadow-xl shadow-red-50"><Icon name="reset" /> تصفير الأسبوع بالكامل</button>}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
